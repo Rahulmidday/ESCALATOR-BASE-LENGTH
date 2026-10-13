@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Escalator Base Length Calculator | BLT Brilliant Lifts and Escalators</title>
+<meta name="description" content="Work out the base length of an escalator from the floor height and a 30 or 35 degree incline, with a live side-view drawing.">
+<script>
+  /* Apply the saved theme before first paint so the page never flashes the wrong one. */
+  (function () {
+    try {
+      var t = localStorage.getItem("blt-esc-theme");
+      if (t === "light" || t === "dark") { document.documentElement.setAttribute("data-theme", t); return; }
+    } catch (e) {}
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#calc">Skip to the calculator</a>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#10283C"/>
+        <path d="M6 24h7v-6h7v-6h6" fill="none" stroke="#F2B705" stroke-width="3.2" stroke-linejoin="miter"/>
+      </svg>
+      <span>BLT Brilliant Lifts and Escalators</span>
+    </div>
+    <div class="top-actions">
+      <div class="seg" role="radiogroup" aria-label="Units">
+        <input type="radio" name="unit" id="uMm" value="mm" checked><label for="uMm">mm</label>
+        <input type="radio" name="unit" id="uM" value="m"><label for="uM">m</label>
+        <input type="radio" name="unit" id="uFt" value="ft"><label for="uFt">ft</label>
+      </div>
+      <button type="button" id="themeBtn" class="icon-btn" aria-pressed="false" aria-label="Dark theme">
+        <svg class="ico-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
+        <svg class="ico-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="intro">
+      <h1>Escalator base length</h1>
+      <p>Enter the floor height and choose the incline. The drawing resizes to match, and the base length updates with it.</p>
+    </div>
+
+    <div class="bench" id="calc">
+
+      <!-- Drawing -->
+      <section class="stage-card" aria-label="Escalator drawing">
+        <svg id="stage" viewBox="0 0 800 600" role="img" aria-label="Side view of an escalator">
+          <defs>
+            <pattern id="gridPat" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" class="grid-line"/></pattern>
+            <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="9" class="hatch-line"/></pattern>
+            <linearGradient id="trussGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="stop-a"/><stop offset="1" class="stop-b"/></linearGradient>
+            <clipPath id="bandClip"><polygon id="bandPoly" points="0,0 0,0 0,0"/></clipPath>
+            <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" class="arrow-fill"/></marker>
+            <g id="person">
+              <circle cx="0" cy="-1590" r="115"/>
+              <rect x="-210" y="-1470" width="420" height="720" rx="170"/>
+              <rect x="-165" y="-820" width="140" height="820" rx="55"/>
+              <rect x="25" y="-820" width="140" height="820" rx="55"/>
+            </g>
+          </defs>
+
+          <rect width="800" height="600" fill="url(#gridPat)"/>
+
+          <line id="floorRef" class="ref"/>
+          <rect id="lowerSlab" class="slab"/>
+          <rect id="upperSlab" class="slab"/>
+          <use id="scaleFig" href="#person" class="fig" aria-hidden="true"/>
+
+          <polygon id="truss" class="truss"/>
+          <g clip-path="url(#bandClip)">
+            <path id="stepBody" class="step-body"/>
+            <path id="treads" class="treads"/>
+          </g>
+          <line id="skirt" class="skirt"/>
+
+          <use id="rider" href="#person" class="fig" aria-hidden="true"/>
+
+          <polygon id="glass" class="glass"/>
+          <path id="rail" class="rail"/>
+          <path id="railSheen" class="rail-sheen"/>
+
+          <path id="angleSector" class="angle-sector"/>
+          <text id="angleText" class="lbl halo" x="0" y="0">30°</text>
+
+          <line id="extLA" class="ext"/>
+          <line id="extLB" class="ext"/>
+          <line id="dimLLine" class="dim" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+          <g id="dimLPlate"><rect class="plate"/><text class="lbl plate-text" x="0" y="0"></text></g>
+
+          <line id="dimHLine" class="dim" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+          <g id="dimHPlate"><rect class="plate"/><text class="lbl plate-text" x="0" y="0"></text></g>
+
+          <circle id="ptA" class="pt" r="4.5"/>
+          <circle id="ptB" class="pt" r="4.5"/>
+        </svg>
+
+        <div class="stage-bar">
+          <button type="button" id="playBtn" class="btn ghost">
+            <svg class="ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+            <svg class="ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>
+            <span id="playLabel">Pause</span>
+          </button>
+          <div class="grp">
+            <span class="grp-label" id="dirLabel">Steps go</span>
+            <div class="seg" role="radiogroup" aria-labelledby="dirLabel">
+              <input type="radio" name="dir" id="dirUp" value="1" checked><label for="dirUp">Up</label>
+              <input type="radio" name="dir" id="dirDown" value="-1"><label for="dirDown">Down</label>
+            </div>
+          </div>
+          <div class="grp">
+            <span class="grp-label" id="spdLabel">Speed (m/s)</span>
+            <div class="seg" role="radiogroup" aria-labelledby="spdLabel">
+              <input type="radio" name="speed" id="sp50" value="0.5" checked><label for="sp50">0.50</label>
+              <input type="radio" name="speed" id="sp65" value="0.65"><label for="sp65">0.65</label>
+              <input type="radio" name="speed" id="sp75" value="0.75"><label for="sp75">0.75</label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Inputs and result -->
+      <div class="side">
+        <section class="panel" aria-labelledby="inTitle">
+          <h2 id="inTitle">Your escalator</h2>
+          <p class="sub">Two inputs are all it takes.</p>
+
+          <div class="field">
+            <label for="height">Floor height</label>
+            <div class="numwrap">
+              <input id="height" type="number" inputmode="decimal" min="0" step="any" value="4000" autocomplete="off">
+              <span class="unit-tag" id="unitTag">mm</span>
+            </div>
+            <input id="heightRange" type="range" min="2000" max="12000" step="10" value="4000" aria-label="Floor height slider">
+            <p class="hint" id="heightHint"></p>
+            <p class="error" id="heightError" role="alert" hidden></p>
+          </div>
+
+          <fieldset class="field">
+            <legend>Incline angle</legend>
+            <div class="seg seg-lg" role="radiogroup" aria-label="Incline angle">
+              <input type="radio" name="angle" id="a30" value="30" checked><label for="a30">30°</label>
+              <input type="radio" name="angle" id="a35" value="35"><label for="a35">35°</label>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="panel result" id="resultPanel" aria-labelledby="outTitle">
+          <h2 id="outTitle">Base length</h2>
+          <p class="sub">The horizontal distance the escalator covers along the floor.</p>
+
+          <p class="big"><span id="baseValue">0</span><span class="u" id="baseUnit">mm</span></p>
+
+          <dl class="facts">
+            <div class="row" data-u="mm"><dt>Millimetres</dt><dd></dd></div>
+            <div class="row" data-u="m"><dt>Metres</dt><dd></dd></div>
+            <div class="row" data-u="ft"><dt>Feet</dt><dd></dd></div>
+            <div class="row"><dt>Incline length</dt><dd id="fInc"></dd></div>
+            <div class="row"><dt>Steps at 210 mm riser</dt><dd id="fSteps"></dd></div>
+          </dl>
+
+          <div class="cmp">
+            <h3>Both inclines at this height</h3>
+            <div class="cmp-row" id="c30row"><span class="ang">30°</span><span class="bar"><i id="c30bar"></i></span><span class="val" id="c30val"></span></div>
+            <div class="cmp-row" id="c35row"><span class="ang">35°</span><span class="bar"><i id="c35bar"></i></span><span class="val" id="c35val"></span></div>
+          </div>
+
+          <div class="actions">
+            <button type="button" id="copyBtn" class="btn primary">Copy result</button>
+            <button type="button" id="saveBtn" class="btn ghost">Save to log</button>
+          </div>
+          <p class="status" id="actionStatus" role="status"></p>
+        </section>
+      </div>
+    </div>
+
+    <div class="lower">
+      <section class="panel" aria-labelledby="howTitle">
+        <h2 id="howTitle">How the result is worked out</h2>
+        <p class="sub">The same five steps as the C program, in the same order.</p>
+        <ol class="calc-steps">
+          <li><span class="t">Read the floor height</span><span class="v" id="s1"></span></li>
+          <li><span class="t">Read the incline angle</span><span class="v" id="s2"></span></li>
+          <li><span class="t">Convert degrees to radians</span><span class="v" id="s3"></span></li>
+          <li><span class="t">Take the tangent of the angle</span><span class="v" id="s4"></span></li>
+          <li><span class="t">Divide height by the tangent</span><span class="v" id="s5"></span></li>
+        </ol>
+      </section>
+
+      <section class="panel" aria-labelledby="logTitle">
+        <div class="log-head">
+          <h2 id="logTitle">Saved calculations</h2>
+          <button type="button" id="clearLog" class="btn text" hidden>Clear all</button>
+        </div>
+        <p class="sub">Kept in this browser only.</p>
+        <ul class="log" id="logList"></ul>
+        <p class="empty" id="logEmpty">Nothing saved yet. Choose Save to log to keep a calculation.</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="credit">© Rahul Midday</div>
+<div class="sr-only" id="liveRegion" aria-live="polite"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
