@@ -65,7 +65,7 @@ const pts = (list) => list.map((p) => r2(p[0]) + "," + r2(p[1])).join(" ");
 /* =====================================================================
    3. DRAWING CONSTANTS (millimetres unless noted)
    ===================================================================== */
-const VBW = 800, YB = 440;                 // drawing width and lower-floor line (px)
+const VBW = 800, VBH = 600, YB = 440;                 // drawing width and lower-floor line (px)
 const S0 = 0.072, MAXH = 290, MAXW = 560;   // px per mm, and the fit limits in px
 const RISER = 210;                          // step riser
 const TRUSS_D = 1000, BAND = 420;           // truss depth, step band depth
@@ -92,6 +92,7 @@ const state = {
   rider: { c0: 0 },
   s: S0,
   fs: 22,
+  hk: 1,                       // handle size factor, larger on small screens
   log: []
 };
 let dirty = true, lastT = performance.now(), announceTimer = 0, flashTimer = 0;
@@ -103,7 +104,8 @@ const dom = {};
   "dimHLine", "dimHPlate", "ptA", "ptB",
   "height", "heightRange", "heightHint", "heightError", "unitTag", "baseValue", "baseUnit", "fInc", "fSteps",
   "c30row", "c35row", "c30bar", "c35bar", "c30val", "c35val", "resultPanel", "copyBtn", "saveBtn", "actionStatus",
-  "s1", "s2", "s3", "s4", "s5", "logList", "logEmpty", "clearLog", "playBtn", "playLabel", "themeBtn", "liveRegion"
+  "s1", "s2", "s3", "s4", "s5", "logList", "logEmpty", "clearLog", "playBtn", "playLabel", "themeBtn", "liveRegion",
+  "tip", "tipTitle", "tipBody", "handle"
 ].forEach((id) => { dom[id] = $(id); });
 const factRows = Array.prototype.slice.call(document.querySelectorAll(".facts [data-u]"));
 
@@ -139,7 +141,9 @@ function syncRange() {
   dom.heightRange.value = state.heightMm;
   const pct = clamp((state.heightMm - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN), 0, 1) * 100;
   dom.heightRange.style.setProperty("--fill", pct + "%");
-  dom.heightRange.setAttribute("aria-valuetext", fmtU(state.heightMm, state.unit, UNITS[state.unit].labelDp));
+  const txt = fmtU(state.heightMm, state.unit, UNITS[state.unit].labelDp);
+  dom.heightRange.setAttribute("aria-valuetext", txt);
+  setAttrs(dom.handle, { "aria-valuemin": SLIDER_MIN, "aria-valuemax": SLIDER_MAX, "aria-valuenow": Math.round(state.heightMm), "aria-valuetext": txt });
 }
 
 function updateHint() {
@@ -272,6 +276,8 @@ function renderReadouts() {
   dom.c35bar.style.width = (b35 / b30 * 100).toFixed(1) + "%";
   dom.c30row.classList.toggle("on", state.angle === 30);
   dom.c35row.classList.toggle("on", state.angle === 35);
+  dom.c30row.setAttribute("aria-pressed", String(state.angle === 30));
+  dom.c35row.setAttribute("aria-pressed", String(state.angle === 35));
 }
 
 
@@ -362,8 +368,7 @@ function draw() {
   dom.angleSector.setAttribute("d",
     "M" + r2(x0) + " " + r2(yB) + "L" + r2(x0 + R) + " " + r2(yB) +
     "A" + r2(R) + " " + r2(R) + " 0 0 0 " + r2(x0 + R * cosT) + " " + r2(yB - R * sinT) + "Z");
-  const tr2 = R + state.fs * 0.9;
-  setAttrs(dom.angleText, { x: r2(x0 + tr2 * Math.cos(th / 2)), y: r2(yB - tr2 * Math.sin(th / 2)) });
+  setAttrs(dom.angleText, { x: r2(x0 - 12), y: r2(yB - state.fs * 0.85) });
   setText(dom.angleText, +a.toFixed(1) + "°");
 
   // Dimension: base length (horizontal)
@@ -379,6 +384,7 @@ function draw() {
 
   setAttrs(dom.ptA, { cx: r2(x0), cy: yB });
   setAttrs(dom.ptB, { cx: r2(x1), cy: r2(yT) });
+  dom.handle.setAttribute("transform", "translate(" + r2(x1) + " " + r2(yT) + ") scale(" + state.hk.toFixed(3) + ")");
 }
 
 
@@ -417,6 +423,7 @@ function frame(now) {
   }
   if (state.playing) advance(dt);
 
+  if (hoverKey) renderTip();
   if (tweened || dirty) renderReadouts();
   if (tweened || dirty || state.playing) draw();
   dirty = false;
@@ -426,6 +433,7 @@ function frame(now) {
 function updateFs() {
   const w = dom.stage.getBoundingClientRect().width || VBW;
   state.fs = clamp(15 / (w / VBW), 20, 40);
+  state.hk = clamp(12 / (w / VBW) / 13, 1, 2.2);
   dom.stage.style.setProperty("--fs", state.fs.toFixed(1) + "px");
   dirty = true;
 }
@@ -519,6 +527,214 @@ dom.saveBtn.addEventListener("click", () => {
   flash("Saved to the log.");
 });
 dom.clearLog.addEventListener("click", () => { state.log = []; saveLog(); renderLog(); });
+
+
+/* =====================================================================
+   11b. DRAWING INTERACTION
+   Hover or tap for details, drag the round handle to set the height,
+   select the angle marker (or a comparison row) to switch the incline.
+   None of this touches calculateBaseLength.
+   ===================================================================== */
+const TIP_ORDER = ["handle", "angle", "base", "height", "person", "rail", "steps", "glass", "truss", "lowfloor", "upfloor"];
+const drag = { active: false, id: null, y: 0, h: 0 };
+let hoverKey = null, tipTimer = 0, suppressClick = false;
+
+function setHeightFromUI(mm) {
+  state.heightMm = clamp(Math.round(mm / 10) * 10, SLIDER_MIN, SLIDER_MAX);
+  writeHeightField();
+  commit();
+}
+
+function setAngle(a) {
+  if (a !== 30 && a !== 35) return;
+  state.angle = a;
+  const radio = document.getElementById(a === 30 ? "a30" : "a35");
+  if (radio) radio.checked = true;
+  commit();
+}
+
+/* Light up a part of the drawing together with its matching panel. */
+function setHot(key, on) {
+  document.querySelectorAll('[data-tip="' + key + '"], [data-link="' + key + '"]').forEach((n) => n.classList.toggle("hot", on));
+}
+
+/* The part under the pointer; the handle and angle win over parts drawn beneath them. */
+function pickAt(x, y) {
+  let best = null, rank = 99;
+  document.elementsFromPoint(x, y).forEach((n) => {
+    const t = n.closest ? n.closest("[data-tip]") : null;
+    if (!t || !dom.stage.contains(t)) return;
+    const r = TIP_ORDER.indexOf(t.getAttribute("data-tip"));
+    if (r !== -1 && r < rank) { best = t; rank = r; }
+  });
+  return best;
+}
+
+function tipContent(key) {
+  const u = state.unit, dp = UNITS[u].labelDp;
+  const r = state.result;
+  const h = r ? r.height : state.cur.h, a = r ? r.angle : state.cur.a;
+  const th = a * PI / 180.0;
+  const base = h / Math.tan(th), inc = h / Math.sin(th);
+  switch (key) {
+    case "handle":   return ["Floor height", fmtU(h, u, dp) + ". Drag up or down to change it, or use the arrow keys."];
+    case "angle":    return ["Incline angle", a + "°. Select it to switch to " + (a === 30 ? 35 : 30) + "°."];
+    case "base":     return ["Base length", fmtU(base, u, dp) + ". The floor height divided by tan(" + a + "°)."];
+    case "height":   return ["Floor height", fmtU(h, u, dp) + " from the lower floor to the upper floor."];
+    case "truss":    return ["Truss", "The steel frame under the steps. Along the slope it measures " + fmtU(inc, u, dp) + "."];
+    case "steps":    return ["Steps", "About " + Math.round(h / RISER) + " steps at a " + RISER + " mm riser, moving at " + state.speed.toFixed(2) + " m/s."];
+    case "rail":     return ["Handrail", "Moves at the same speed as the steps."];
+    case "glass":    return ["Balustrade", "The glass panel between the steps and the handrail."];
+    case "person":   return ["Passenger", "Drawn 1.7 m tall, so you can judge the size."];
+    case "lowfloor": return ["Lower floor", "Where passengers step on."];
+    case "upfloor":  return ["Upper floor", fmtU(h, u, dp) + " above the lower floor."];
+    default:         return ["", ""];
+  }
+}
+
+function renderTip() {
+  if (!hoverKey) return;
+  const c = tipContent(hoverKey);
+  setText(dom.tipTitle, c[0]);
+  setText(dom.tipBody, c[1]);
+}
+
+/* Place the tooltip near a point (client coordinates), kept inside the drawing. */
+function placeTip(cx, cy) {
+  const wrap = dom.tip.parentNode.getBoundingClientRect();
+  dom.tip.hidden = false;
+  const w = dom.tip.offsetWidth, hgt = dom.tip.offsetHeight;
+  let x = cx - wrap.left + 14, y = cy - wrap.top + 18;
+  if (x + w > wrap.width - 8) x = cx - wrap.left - w - 14;
+  if (y + hgt > wrap.height - 8) y = cy - wrap.top - hgt - 14;
+  x = clamp(x, 8, Math.max(8, wrap.width - w - 8));
+  y = clamp(y, 8, Math.max(8, wrap.height - hgt - 8));
+  dom.tip.style.transform = "translate(" + Math.round(x) + "px, " + Math.round(y) + "px)";
+}
+
+function hover(el, cx, cy) {
+  const key = el ? el.getAttribute("data-tip") : null;
+  if (key !== hoverKey) {
+    if (hoverKey) setHot(hoverKey, false);
+    hoverKey = key;
+    if (key) setHot(key, true);
+  }
+  if (key) { renderTip(); placeTip(cx, cy); }
+  else dom.tip.hidden = true;
+}
+
+function hoverByFocus(el) {
+  const b = el.getBoundingClientRect();
+  hover(el, b.left + b.width / 2, b.top + b.height / 2);
+}
+
+function svgY(e) {
+  const r = dom.stage.getBoundingClientRect();
+  return (e.clientY - r.top) * (VBH / r.height);
+}
+
+/* Hover (mouse) and tap (touch) */
+dom.stage.addEventListener("pointermove", (e) => {
+  if (drag.active || e.pointerType === "touch") return;
+  hover(pickAt(e.clientX, e.clientY), e.clientX, e.clientY);
+});
+dom.stage.addEventListener("pointerleave", (e) => {
+  if (!drag.active && e.pointerType !== "touch") hover(null);
+});
+dom.stage.addEventListener("pointerdown", (e) => {
+  if (drag.active) return;
+  hover(pickAt(e.clientX, e.clientY), e.clientX, e.clientY);
+  if (e.pointerType === "touch") {
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => hover(null), 3500);
+  }
+});
+dom.stage.addEventListener("click", (e) => {
+  if (suppressClick) return;
+  const el = pickAt(e.clientX, e.clientY);
+  if (el && el.getAttribute("data-tip") === "angle") setAngle(state.angle === 30 ? 35 : 30);
+});
+
+/* Drag the handle. Each move changes the height by the pointer's travel divided by the
+   drawing scale, so the handle stays under the pointer while the drawing is at full size
+   and the height keeps changing smoothly once the drawing starts to shrink to fit. */
+dom.handle.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
+dom.handle.addEventListener("pointerdown", (e) => {
+  if (e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  drag.active = true;
+  drag.id = e.pointerId;
+  drag.y = svgY(e);
+  drag.h = state.heightMm;
+  try { dom.handle.setPointerCapture(e.pointerId); } catch (err) { /* capture unavailable */ }
+  dom.stage.classList.add("is-dragging");
+  clearTimeout(tipTimer);
+  hover(dom.handle, e.clientX, e.clientY);
+});
+dom.handle.addEventListener("pointermove", (e) => {
+  if (!drag.active || e.pointerId !== drag.id) return;
+  const y = svgY(e);
+  drag.h = clamp(drag.h + (drag.y - y) / state.s, SLIDER_MIN, SLIDER_MAX);
+  drag.y = y;
+  setHeightFromUI(drag.h);
+  placeTip(e.clientX, e.clientY);
+});
+function endDrag(e) {
+  if (!drag.active || e.pointerId !== drag.id) return;
+  drag.active = false;
+  try { dom.handle.releasePointerCapture(e.pointerId); } catch (err) { /* already released */ }
+  dom.stage.classList.remove("is-dragging");
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 0);
+  if (e.pointerType === "touch") { clearTimeout(tipTimer); tipTimer = setTimeout(() => hover(null), 1500); }
+}
+dom.handle.addEventListener("pointerup", endDrag);
+dom.handle.addEventListener("pointercancel", endDrag);
+
+/* Keyboard: the handle is a slider, the angle marker is a button */
+dom.handle.addEventListener("keydown", (e) => {
+  const step = e.shiftKey ? 500 : 50;
+  let next = null;
+  if (e.key === "ArrowUp" || e.key === "ArrowRight") next = state.heightMm + step;
+  else if (e.key === "ArrowDown" || e.key === "ArrowLeft") next = state.heightMm - step;
+  else if (e.key === "PageUp") next = state.heightMm + 500;
+  else if (e.key === "PageDown") next = state.heightMm - 500;
+  else if (e.key === "Home") next = SLIDER_MIN;
+  else if (e.key === "End") next = SLIDER_MAX;
+  if (next === null) return;
+  e.preventDefault();
+  setHeightFromUI(next);
+});
+dom.handle.addEventListener("focus", () => hoverByFocus(dom.handle));
+dom.handle.addEventListener("blur", () => hover(null));
+
+dom.angleSector.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setAngle(state.angle === 30 ? 35 : 30); }
+});
+dom.angleSector.addEventListener("focus", () => hoverByFocus(dom.angleSector));
+dom.angleSector.addEventListener("blur", () => hover(null));
+
+/* The two comparison rows work as buttons */
+[[dom.c30row, 30], [dom.c35row, 35]].forEach((pair) => {
+  const row = pair[0], a = pair[1];
+  row.setAttribute("role", "button");
+  row.tabIndex = 0;
+  row.setAttribute("aria-label", "Use " + a + " degrees");
+  row.addEventListener("click", () => setAngle(a));
+  row.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setAngle(a); }
+  });
+});
+
+/* Panels light up the matching part of the drawing */
+document.querySelectorAll("[data-link]").forEach((n) => {
+  const key = n.getAttribute("data-link");
+  n.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") setHot(key, true); });
+  n.addEventListener("pointerleave", () => setHot(key, false));
+  n.addEventListener("focusin", () => setHot(key, true));
+  n.addEventListener("focusout", () => setHot(key, false));
+});
 
 
 /* =====================================================================
