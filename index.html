@@ -57,6 +57,7 @@
 
       <!-- Drawing -->
       <section class="stage-card" aria-label="Escalator drawing">
+        <div class="stage-wrap">
         <svg id="stage" viewBox="0 0 800 600" role="img" aria-label="Side view of an escalator">
           <defs>
             <pattern id="gridPat" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" class="grid-line"/></pattern>
@@ -75,37 +76,46 @@
           <rect width="800" height="600" fill="url(#gridPat)"/>
 
           <line id="floorRef" class="ref"/>
-          <rect id="lowerSlab" class="slab"/>
-          <rect id="upperSlab" class="slab"/>
-          <use id="scaleFig" href="#person" class="fig" aria-hidden="true"/>
+          <rect id="lowerSlab" class="slab" data-tip="lowfloor"/>
+          <rect id="upperSlab" class="slab" data-tip="upfloor"/>
+          <use id="scaleFig" href="#person" class="fig" data-tip="person" aria-hidden="true"/>
 
-          <polygon id="truss" class="truss"/>
+          <polygon id="truss" class="truss" data-tip="truss"/>
           <g clip-path="url(#bandClip)">
-            <path id="stepBody" class="step-body"/>
-            <path id="treads" class="treads"/>
+            <path id="stepBody" class="step-body" data-tip="steps"/>
+            <path id="treads" class="treads" data-tip="steps"/>
           </g>
           <line id="skirt" class="skirt"/>
 
-          <use id="rider" href="#person" class="fig" aria-hidden="true"/>
+          <use id="rider" href="#person" class="fig" data-tip="person" aria-hidden="true"/>
 
-          <polygon id="glass" class="glass"/>
-          <path id="rail" class="rail"/>
+          <polygon id="glass" class="glass" data-tip="glass"/>
+          <path id="rail" class="rail" data-tip="rail"/>
           <path id="railSheen" class="rail-sheen"/>
 
-          <path id="angleSector" class="angle-sector"/>
-          <text id="angleText" class="lbl halo" x="0" y="0">30°</text>
+          <path id="angleSector" class="angle-sector" data-tip="angle" tabindex="0" role="button" aria-label="Incline angle. Press Enter to switch between 30 and 35 degrees"/>
+          <text id="angleText" class="lbl halo" data-tip="angle" x="0" y="0">30°</text>
 
           <line id="extLA" class="ext"/>
           <line id="extLB" class="ext"/>
-          <line id="dimLLine" class="dim" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-          <g id="dimLPlate"><rect class="plate"/><text class="lbl plate-text" x="0" y="0"></text></g>
+          <line id="dimLLine" class="dim" data-tip="base" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+          <g id="dimLPlate" data-tip="base"><rect class="plate"/><text class="lbl plate-text" x="0" y="0"></text></g>
 
-          <line id="dimHLine" class="dim" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-          <g id="dimHPlate"><rect class="plate"/><text class="lbl plate-text" x="0" y="0"></text></g>
+          <line id="dimHLine" class="dim" data-tip="height" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+          <g id="dimHPlate" data-tip="height"><rect class="plate"/><text class="lbl plate-text" x="0" y="0"></text></g>
 
           <circle id="ptA" class="pt" r="4.5"/>
           <circle id="ptB" class="pt" r="4.5"/>
+
+          <g id="handle" class="handle" data-tip="handle" tabindex="0" role="slider" aria-orientation="vertical" aria-label="Floor height">
+            <circle class="hit" r="26"/>
+            <circle class="knob" r="13"/>
+            <path class="knob-glyph" d="M0 -8.5L4.6 -3.2H-4.6ZM0 8.5L4.6 3.2H-4.6Z"/>
+          </g>
         </svg>
+        <div class="tip" id="tip" role="tooltip" hidden><strong id="tipTitle"></strong><span id="tipBody"></span></div>
+        </div>
+        <p class="stage-hint">Drag the round handle at the top to change the height. Select the angle marker to switch between 30° and 35°. Hover or tap any part to see what it is.</p>
 
         <div class="stage-bar">
           <button type="button" id="playBtn" class="btn ghost">
@@ -137,7 +147,7 @@
           <h2 id="inTitle">Your escalator</h2>
           <p class="sub">Two inputs are all it takes.</p>
 
-          <div class="field">
+          <div class="field" data-link="height">
             <label for="height">Floor height</label>
             <div class="numwrap">
               <input id="height" type="number" inputmode="decimal" min="0" step="any" value="4000" autocomplete="off">
@@ -148,7 +158,7 @@
             <p class="error" id="heightError" role="alert" hidden></p>
           </div>
 
-          <fieldset class="field">
+          <fieldset class="field" data-link="angle">
             <legend>Incline angle</legend>
             <div class="seg seg-lg" role="radiogroup" aria-label="Incline angle">
               <input type="radio" name="angle" id="a30" value="30" checked><label for="a30">30°</label>
@@ -157,7 +167,7 @@
           </fieldset>
         </section>
 
-        <section class="panel result" id="resultPanel" aria-labelledby="outTitle">
+        <section class="panel result" id="resultPanel" data-link="base" aria-labelledby="outTitle">
           <h2 id="outTitle">Base length</h2>
           <p class="sub">The horizontal distance the escalator covers along the floor.</p>
 
