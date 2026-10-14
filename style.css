@@ -146,7 +146,7 @@ h1 {
 
 /* ---------- Layout ---------- */
 .bench { display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr); }
-.side { display: grid; gap: 22px; min-width: 0; }
+.side { display: grid; gap: 22px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .lower { display: grid; gap: 22px; margin-top: 22px; grid-template-columns: minmax(0, 1fr); }
 
 @media (min-width: 980px) {
@@ -231,8 +231,9 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 
 /* ---------- Result ---------- */
 .big { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin: 6px 0 4px; font-family: var(--display); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-#baseValue { font-size: clamp(3.4rem, 9vw, 5.2rem); letter-spacing: -.01em; }
+#baseValue { font-size: clamp(2.6rem, 16cqw, 5.2rem); letter-spacing: -.01em; }
 .big .u { font-size: 1.8rem; font-weight: 500; color: var(--ink-soft); }
+.result { container-type: inline-size; }
 .result.stale .big { opacity: .4; }
 
 .facts { margin: 16px 0 0; padding: 0; }
@@ -286,7 +287,8 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .pt { fill: var(--accent); stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .lbl { font-family: var(--display); font-weight: 700; font-size: var(--fs, 22px); dominant-baseline: central; }
 .plate-text { fill: var(--on-accent); text-anchor: middle; }
-.halo { fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--truss-a); stroke-width: 5px; stroke-linejoin: round; }
+.halo { fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--stage); stroke-width: 5px; stroke-linejoin: round; }
+#angleText { text-anchor: end; }
 
 /* ---------- Calculation steps ---------- */
 .calc-steps { list-style: none; margin: 0; padding: 0; counter-reset: st; }
@@ -333,3 +335,42 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Interaction ---------- */
+.stage-wrap { position: relative; }
+#stage { user-select: none; -webkit-user-select: none; }
+#stage.is-dragging, #stage.is-dragging * { cursor: ns-resize; }
+
+.tip {
+  position: absolute; left: 0; top: 0; z-index: 6; max-width: 250px; padding: 9px 12px;
+  border-radius: 10px; background: var(--ink); color: var(--surface);
+  font-size: .875rem; line-height: 1.4; pointer-events: none;
+  box-shadow: 0 8px 24px rgba(10, 25, 40, .28);
+}
+.tip strong { display: block; margin-bottom: 2px; font-size: .9375rem; font-weight: 700; }
+
+.stage-hint { margin: 0; padding: 10px 16px 12px; max-width: 72ch; font-size: .875rem; color: var(--ink-soft); }
+
+.hit { fill: transparent; pointer-events: all; }
+.handle { cursor: ns-resize; outline: none; touch-action: none; }
+.knob { fill: var(--accent); stroke: var(--ink); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.knob-glyph { fill: var(--on-accent); }
+.handle:hover .knob, .is-dragging .knob { stroke-width: 2.8; }
+.handle:focus-visible .knob { stroke: var(--focus); stroke-width: 3.4; }
+
+.angle-sector, #angleText { cursor: pointer; outline: none; }
+.angle-sector:focus-visible { stroke: var(--focus); stroke-width: 3; }
+
+/* parts of the drawing and the matching panels light up together */
+.truss.hot, .glass.hot, .slab.hot { stroke: var(--accent); stroke-width: 2.6; }
+.step-body.hot { stroke: var(--accent); stroke-width: 2; }
+.rail.hot { stroke: var(--accent); }
+.fig.hot { fill: var(--ink); }
+.dim.hot { stroke-width: 3.2; }
+.hot .plate { stroke: var(--ink); stroke-width: 2.4; vector-effect: non-scaling-stroke; }
+.angle-sector.hot { fill-opacity: .7; }
+.result.hot, .field.hot .numwrap, .field.hot .seg-lg { box-shadow: 0 0 0 2px var(--accent); }
+
+.cmp-row { margin: 0 -8px; padding: 5px 8px; border-radius: 8px; cursor: pointer; }
+.cmp-row:hover { background: var(--seg-bg); }
+.cmp-row:hover .ang, .cmp-row:hover .val { color: var(--ink); }
